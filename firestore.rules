@@ -1,0 +1,99 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helpers
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function isEmailVerified() { return request.auth.token.email_verified == true; }
+
+    // Pillar 2: Validation Blueprints
+    function isValidUserPrivate(data) {
+      return data.email is string && data.email.size() <= 100 &&
+             data.updatedAt == request.time;
+    }
+
+    function isValidUserPublic(data) {
+      return data.name is string && data.name.size() <= 100 &&
+             data.initials is string && data.initials.size() <= 4 &&
+             data.walletBalance is number && data.walletBalance >= 0 &&
+             data.updatedAt == request.time;
+    }
+
+    function isValidProfessional(data) {
+      return data.userId == request.auth.uid &&
+             data.title is string && data.title.size() <= 100 &&
+             data.category is string &&
+             data.bio is string && data.bio.size() <= 1000 &&
+             data.updatedAt == request.time;
+    }
+
+    function isValidContract(data) {
+      return data.buyerId is string && data.professionalId is string &&
+             data.amount is number && data.amount > 0 &&
+             data.status in ['requested', 'active', 'completed', 'disputed', 'cancelled'] &&
+             data.createdAt == request.time &&
+             data.updatedAt == request.time;
+    }
+
+    function isValidTransaction(data) {
+      return data.userId == request.auth.uid &&
+             data.type in ['pay', 'receive'] &&
+             data.amount is number && data.amount > 0 &&
+             data.date == request.time;
+    }
+
+    // 1. Private User Info (PII) - LGPD Strict
+    match /users/{userId}/private/info {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUserPrivate(incoming());
+      allow update: if isOwner(userId) && isValidUserPrivate(incoming()) && 
+                    incoming().diff(existing()).affectedKeys().hasOnly(['email', 'phone', 'address', 'updatedAt']);
+    }
+
+    // 2. Public User Info
+    match /users/{userId}/public/info {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId) && isValidUserPublic(incoming());
+      allow update: if isOwner(userId) && isValidUserPublic(incoming()) &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['name', 'initials', 'avatar', 'isProfessional', 'walletBalance', 'updatedAt']);
+    }
+
+    // 3. Professional Profiles
+    match /professionals/{profId} {
+      allow read: if true; // Public for discovery
+      allow create: if isSignedIn() && isValidId(profId) && isValidProfessional(incoming());
+      allow update: if isOwner(existing().userId) && isValidProfessional(incoming()) &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['title', 'category', 'bio', 'skills', 'rate', 'chargingModel', 'visitPrice', 'visitType', 'milestones', 'updatedAt']);
+    }
+
+    // 4. Contracts (Escrow)
+    match /contracts/{contractId} {
+      allow get: if isSignedIn() && (request.auth.uid == resource.data.buyerId || request.auth.uid == resource.data.professionalId);
+      allow list: if isSignedIn() && (resource.data.buyerId == request.auth.uid || resource.data.professionalId == request.auth.uid);
+      
+      allow create: if isSignedIn() && isValidId(contractId) && isValidContract(incoming()) &&
+                    incoming().buyerId == request.auth.uid;
+      
+      allow update: if isSignedIn() && isValidContract(incoming()) && (
+        // Buyer action: Cancel or Complete
+        (request.auth.uid == existing().buyerId && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])) ||
+        // Professional action: Update evidence or accept
+        (request.auth.uid == existing().professionalId && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'evidence', 'updatedAt']))
+      );
+    }
+
+    // 5. Transactions
+    match /transactions/{txId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isValidId(txId) && isValidTransaction(incoming());
+    }
+  }
+}

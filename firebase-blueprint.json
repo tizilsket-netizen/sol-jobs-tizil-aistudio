@@ -1,0 +1,116 @@
+{
+  "entities": {
+    "UserPrivate": {
+      "title": "User Private Information",
+      "description": "Sensitive PII shielded for LGPD compliance",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "updatedAt"]
+    },
+    "UserPublic": {
+      "title": "User Public Profile",
+      "description": "Data visible to other users in the platform",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "initials": { "type": "string" },
+        "avatar": { "type": "string" },
+        "walletBalance": { "type": "number" },
+        "isProfessional": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "initials", "walletBalance", "updatedAt"]
+    },
+    "ProfessionalProfile": {
+      "title": "Professional Services Profile",
+      "description": "Details about a professional's offer",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "bio": { "type": "string" },
+        "skills": { "type": "array", "items": { "type": "string" } },
+        "rate": { "type": "string" },
+        "chargingModel": { "type": "string", "enum": ["hourly", "milestones", "retainer"] },
+        "visitPrice": { "type": "number" },
+        "visitType": { "type": "string" },
+        "milestones": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "percentage": { "type": "number" }
+            }
+          }
+        },
+        "rating": { "type": "string" },
+        "projectsCount": { "type": "number" },
+        "completionRate": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "category", "bio", "updatedAt"]
+    },
+    "Contract": {
+      "title": "Service Contract / Escrow",
+      "description": "A binding agreement between buyer and professional",
+      "type": "object",
+      "properties": {
+        "buyerId": { "type": "string" },
+        "professionalId": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "enum": ["BRL", "USDC", "USDT", "SOL"] },
+        "status": { "type": "string", "enum": ["requested", "active", "completed", "disputed", "cancelled"] },
+        "description": { "type": "string" },
+        "milestones": { "type": "array" },
+        "evidence": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["buyerId", "professionalId", "amount", "status", "createdAt", "updatedAt"]
+    },
+    "Transaction": {
+      "title": "Financial Transaction",
+      "description": "Log of wallet movements",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["pay", "receive"] },
+        "amount": { "type": "number" },
+        "method": { "type": "string" },
+        "label": { "type": "string" },
+        "contractId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "amount", "date"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/private/info": {
+      "schema": "UserPrivate",
+      "description": "Private PII isolated for LGPD"
+    },
+    "/users/{userId}/public/info": {
+      "schema": "UserPublic",
+      "description": "Public basic identity"
+    },
+    "/professionals/{profId}": {
+      "schema": "ProfessionalProfile",
+      "description": "Professional offer listings"
+    },
+    "/contracts/{contractId}": {
+      "schema": "Contract",
+      "description": "Escrow and service state"
+    },
+    "/transactions/{txId}": {
+      "schema": "Transaction",
+      "description": "User transaction history"
+    }
+  }
+}

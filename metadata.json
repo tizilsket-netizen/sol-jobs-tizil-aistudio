@@ -1,0 +1,6 @@
+{
+  "name": "SOL-jobs Marketplace",
+  "description": "A general service marketplace where anyone can hire or provide services, featuring secure escrow and hybrid payments (PIX & Crypto).",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
